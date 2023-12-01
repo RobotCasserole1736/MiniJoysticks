@@ -21,6 +21,7 @@
 #include "usb_device.h"
 #include "usbd_hid.h"
 #include <stdbool.h>
+#include <math.h>
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -58,6 +59,10 @@ static void MX_ADC1_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+
+float map(float in, float in_min, float in_max, float out_min, float out_max){
+  return out_min + (out_max - out_min)/(in_max - in_min) * (in - in_min);
+}
 
 /* USER CODE END 0 */
 
@@ -107,14 +112,29 @@ int main(void)
 
     uint8_t report[4];
 
-    //TODO - read X axis
-    
+    // Run ADC Conversion
 
-    //TODO - Y axis
-    report[1] = 0x00;
+    //Rank 0
+    HAL_ADC_Start(&hadc1);
+    HAL_ADC_PollForConversion(&hadc1, 10);
+    uint32_t xAxisADCBits = HAL_ADC_GetValue(&hadc1);
 
-    //TODO - Z axis
-    report[2] = 0x00;
+    //Rank 1
+    HAL_ADC_Start(&hadc1);
+    HAL_ADC_PollForConversion(&hadc1, 10);
+    uint32_t yAxisADCBits = HAL_ADC_GetValue(&hadc1);
+
+    //Rank 2
+    HAL_ADC_Start(&hadc1);
+    HAL_ADC_PollForConversion(&hadc1, 10);
+    uint32_t zAxisADCBits = HAL_ADC_GetValue(&hadc1);
+
+    //Remap axis ranges
+    float xAxisRaw = ((float)xAxisADCBits)/(4096.0) * 2.0 - 1.0; //convert to wpilib -1 to 1 range
+    float yAxisRaw = ((float)yAxisADCBits)/(4096.0) * 2.0 - 1.0; //convert to wpilib -1 to 1 range
+    float zAxisRaw = ((float)zAxisADCBits)/(4096.0) * 2.0 - 1.0; //convert to wpilib -1 to 1 range
+
+    //todo filtering?
 
     // Read buttons 
     // Buttonsn are wired to pull the pin to ground when pressed
@@ -123,9 +143,9 @@ int main(void)
     bool btn1Raw = HAL_GPIO_ReadPin(BTN_1_GPIO_Port, BTN_1_Pin) == GPIO_PIN_RESET;
 
     //populate and send report
-    report[0] = 0x00; //todo x
-    report[1] = 0x00; //todo y
-    report[2] = 0x00; //todo z
+    report[0] = (int8_t)(map(xAxisRaw, -1.0, 1.0, -128.0, 127.0));
+    report[1] = (int8_t)(map(yAxisRaw, -1.0, 1.0, -128.0, 127.0));
+    report[2] = (int8_t)(map(zAxisRaw, -1.0, 1.0, -128.0, 127.0));
     //Bitpack buttons
     report[3] = 0x00;
     if(joyBtnRaw){ report[3] |= 0x01; }
@@ -211,13 +231,13 @@ static void MX_ADC1_Init(void)
   hadc1.Instance = ADC1;
   hadc1.Init.ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV2;
   hadc1.Init.Resolution = ADC_RESOLUTION_12B;
-  hadc1.Init.ScanConvMode = DISABLE;
+  hadc1.Init.ScanConvMode = ENABLE;
   hadc1.Init.ContinuousConvMode = DISABLE;
   hadc1.Init.DiscontinuousConvMode = DISABLE;
   hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
   hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
   hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
-  hadc1.Init.NbrOfConversion = 1;
+  hadc1.Init.NbrOfConversion = 3;
   hadc1.Init.DMAContinuousRequests = DISABLE;
   hadc1.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
   if (HAL_ADC_Init(&hadc1) != HAL_OK)
@@ -229,6 +249,22 @@ static void MX_ADC1_Init(void)
   sConfig.Channel = ADC_CHANNEL_0;
   sConfig.Rank = 1;
   sConfig.SamplingTime = ADC_SAMPLETIME_3CYCLES;
+  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
+  */
+  sConfig.Channel = ADC_CHANNEL_1;
+  sConfig.Rank = 2;
+  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
+  */
+  sConfig.Channel = ADC_CHANNEL_2;
+  sConfig.Rank = 3;
   if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
   {
     Error_Handler();
