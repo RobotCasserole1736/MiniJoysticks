@@ -57,6 +57,22 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
+#define JOY_BTN_Pin GPIO_PIN_3
+#define JOY_BTN_GPIO_Port GPIOA
+#define JOY_Z_Pin GPIO_PIN_2
+#define JOY_Z_GPIO_Port GPIOA
+#define LED_1_Pin GPIO_PIN_7
+#define LED_1_GPIO_Port GPIOA
+#define LED_0_Pin GPIO_PIN_6
+#define LED_0_GPIO_Port GPIOA
+#define BTN_1_Pin GPIO_PIN_5
+#define BTN_1_GPIO_Port GPIOA
+#define JOY_Y_Pin GPIO_PIN_0
+#define JOY_Y_GPIO_Port GPIOA
+#define BTN_0_Pin GPIO_PIN_4
+#define BTN_0_GPIO_Port GPIOA
+#define JOY_X_Pin GPIO_PIN_1
+#define JOY_X_GPIO_Port GPIOA
 /* USER CODE BEGIN Private defines */
 
 /* USER CODE END Private defines */
