@@ -20,6 +20,7 @@
 #include "main.h"
 #include "usb_device.h"
 #include "usbd_hid.h"
+#include <stdbool.h>
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -101,19 +102,44 @@ int main(void)
   while (1)
   {
     /* USER CODE END WHILE */
-    uint8_t report[4] = {
-      0xFF, //joy X
-      0xBF, //joy y
-      0x2F, //joy z
-      0x01, //buttons 8 -> 1
-    };
+
+    /* USER CODE BEGIN 3 */
+
+    uint8_t report[4];
+
+    //TODO - read X axis
+    
+
+    //TODO - Y axis
+    report[1] = 0x00;
+
+    //TODO - Z axis
+    report[2] = 0x00;
+
+    // Read buttons 
+    // Buttonsn are wired to pull the pin to ground when pressed
+    bool joyBtnRaw = HAL_GPIO_ReadPin(JOY_BTN_GPIO_Port, JOY_BTN_Pin) == GPIO_PIN_RESET;
+    bool btn0Raw = HAL_GPIO_ReadPin(BTN_0_GPIO_Port, BTN_0_Pin) == GPIO_PIN_RESET;
+    bool btn1Raw = HAL_GPIO_ReadPin(BTN_1_GPIO_Port, BTN_1_Pin) == GPIO_PIN_RESET;
+
+    //populate and send report
+    report[0] = 0x00; //todo x
+    report[1] = 0x00; //todo y
+    report[2] = 0x00; //todo z
+    //Bitpack buttons
+    report[3] = 0x00;
+    if(joyBtnRaw){ report[3] |= 0x01; }
+    if(btn0Raw)  { report[3] |= 0x02; }
+    if(btn1Raw)  { report[3] |= 0x04; }
+
 
     USBD_HID_SendReport(&hUsbDeviceFS, report, 4);
 
     counter1++;
     HAL_Delay(200);
 
-    /* USER CODE BEGIN 3 */
+
+
   }
   /* USER CODE END 3 */
 }
