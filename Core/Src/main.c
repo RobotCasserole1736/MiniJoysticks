@@ -19,12 +19,12 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "usb_device.h"
-#include "usbd_hid.h"
-#include <stdbool.h>
-#include <math.h>
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "usbd_hid.h"
+#include <stdbool.h>
+#include <math.h>
 
 /* USER CODE END Includes */
 
@@ -44,6 +44,7 @@
 
 /* Private variables ---------------------------------------------------------*/
 ADC_HandleTypeDef hadc1;
+DMA_HandleTypeDef hdma_adc1;
 
 /* USER CODE BEGIN PV */
 
@@ -53,6 +54,7 @@ ADC_HandleTypeDef hadc1;
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_ADC1_Init(void);
+static void MX_DMA_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -60,9 +62,29 @@ static void MX_ADC1_Init(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
+// Utility funciton for mapping values from one range to another
 float map(float in, float in_min, float in_max, float out_min, float out_max){
   return out_min + (out_max - out_min)/(in_max - in_min) * (in - in_min);
 }
+
+// This array hold the the channels ADC value
+volatile uint16_t adc_dma_result[3];
+// This variable calculate the array length.
+// In our case, array size in 3
+int adc_channel_count = sizeof(adc_dma_result)/sizeof(adc_dma_result[0]);
+// This flag will help to detect
+// the DMA conversion completed or not
+uint8_t adc_conv_complete_flag = 0;
+
+// when DMA conversion is completed, HAL_ADC_ConvCpltCallback function
+// will interrupt the processor. You can find this function in
+// Drivers>STM32F4xx_HAL_Drivers>stm32f4xx_hal_adc.c file as __weak attribute
+void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc){
+	// I set adc_conv_complete_flag variable to 1 when,
+	// HAL_ADC_ConvCpltCallback function is call.
+	adc_conv_complete_flag = 1;
+}
+
 
 /* USER CODE END 0 */
 
@@ -95,10 +117,15 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_ADC1_Init();
+  MX_DMA_Init();
   MX_USB_DEVICE_Init();
   /* USER CODE BEGIN 2 */
 
   int8_t counter1 = 0;
+
+  // Initialize the DMA conversion
+  HAL_ADC_Start_DMA(&hadc1, (uint32_t *) adc_dma_result , adc_channel_count);
+
 
   /* USER CODE END 2 */
 
@@ -112,22 +139,18 @@ int main(void)
 
     uint8_t report[4];
 
-    // Run ADC Conversion
+    static uint32_t xAxisADCBits ;
+    static uint32_t yAxisADCBits ;
+    static uint32_t zAxisADCBits ;
 
-    //Rank 0
-    HAL_ADC_Start(&hadc1);
-    HAL_ADC_PollForConversion(&hadc1, 10);
-    uint32_t xAxisADCBits = HAL_ADC_GetValue(&hadc1);
+    // grab new results of ADC conversion if available
+    if(adc_conv_complete_flag == 1){
+      xAxisADCBits = adc_dma_result[0];
+      yAxisADCBits = adc_dma_result[1];
+      zAxisADCBits = adc_dma_result[2];
+       adc_conv_complete_flag = 0;
+    }
 
-    //Rank 1
-    HAL_ADC_Start(&hadc1);
-    HAL_ADC_PollForConversion(&hadc1, 10);
-    uint32_t yAxisADCBits = HAL_ADC_GetValue(&hadc1);
-
-    //Rank 2
-    HAL_ADC_Start(&hadc1);
-    HAL_ADC_PollForConversion(&hadc1, 10);
-    uint32_t zAxisADCBits = HAL_ADC_GetValue(&hadc1);
 
     //Remap axis ranges
     float xAxisRaw = ((float)xAxisADCBits)/(4096.0) * 2.0 - 1.0; //convert to wpilib -1 to 1 range
@@ -156,7 +179,7 @@ int main(void)
     USBD_HID_SendReport(&hUsbDeviceFS, report, 4);
 
     counter1++;
-    HAL_Delay(200);
+    HAL_Delay(10);
 
 
 
@@ -180,10 +203,8 @@ void SystemClock_Config(void)
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI|RCC_OSCILLATORTYPE_HSE;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
   RCC_OscInitStruct.HSEState = RCC_HSE_ON;
-  RCC_OscInitStruct.HSIState = RCC_HSI_ON;
-  RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
   RCC_OscInitStruct.PLL.PLLM = 15;
@@ -198,7 +219,7 @@ void SystemClock_Config(void)
   */
   RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
                               |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
-  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_HSI;
+  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_HSE;
   RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
   RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
   RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
@@ -232,13 +253,13 @@ static void MX_ADC1_Init(void)
   hadc1.Init.ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV2;
   hadc1.Init.Resolution = ADC_RESOLUTION_12B;
   hadc1.Init.ScanConvMode = ENABLE;
-  hadc1.Init.ContinuousConvMode = DISABLE;
+  hadc1.Init.ContinuousConvMode = ENABLE;
   hadc1.Init.DiscontinuousConvMode = DISABLE;
   hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
   hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
   hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
   hadc1.Init.NbrOfConversion = 3;
-  hadc1.Init.DMAContinuousRequests = DISABLE;
+  hadc1.Init.DMAContinuousRequests = ENABLE;
   hadc1.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
   if (HAL_ADC_Init(&hadc1) != HAL_OK)
   {
@@ -248,7 +269,7 @@ static void MX_ADC1_Init(void)
   */
   sConfig.Channel = ADC_CHANNEL_0;
   sConfig.Rank = 1;
-  sConfig.SamplingTime = ADC_SAMPLETIME_3CYCLES;
+  sConfig.SamplingTime = ADC_SAMPLETIME_28CYCLES;
   if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
   {
     Error_Handler();
@@ -272,6 +293,22 @@ static void MX_ADC1_Init(void)
   /* USER CODE BEGIN ADC1_Init 2 */
 
   /* USER CODE END ADC1_Init 2 */
+
+}
+
+/**
+  * Enable DMA controller clock
+  */
+static void MX_DMA_Init(void)
+{
+
+  /* DMA controller clock enable */
+  __HAL_RCC_DMA2_CLK_ENABLE();
+
+  /* DMA interrupt init */
+  /* DMA2_Stream0_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA2_Stream0_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA2_Stream0_IRQn);
 
 }
 
