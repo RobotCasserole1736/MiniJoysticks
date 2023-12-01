@@ -19,6 +19,7 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "usb_device.h"
+#include "usbd_hid.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -91,6 +92,8 @@ int main(void)
   MX_USB_DEVICE_Init();
   /* USER CODE BEGIN 2 */
 
+  int8_t counter1 = 0;
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -98,6 +101,17 @@ int main(void)
   while (1)
   {
     /* USER CODE END WHILE */
+    uint8_t report[4] = {
+      0xFF, //joy X
+      0xBF, //joy y
+      0x2F, //joy z
+      0x01, //buttons 8 -> 1
+    };
+
+    USBD_HID_SendReport(&hUsbDeviceFS, report, 4);
+
+    counter1++;
+    HAL_Delay(200);
 
     /* USER CODE BEGIN 3 */
   }
