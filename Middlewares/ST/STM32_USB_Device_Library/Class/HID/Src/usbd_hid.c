@@ -313,7 +313,7 @@ __ALIGN_BEGIN static uint8_t USBD_HID_DeviceQualifierDesc[USB_LEN_DEV_QUALIFIER_
 
 //auto-Generate this from the joystick.hid file in the root of the repo
 // https://usb.org/document-library/hid-descriptor-tool is the tool which opens the file and spits out hex
-__ALIGN_BEGIN static uint8_t HID_MOUSE_ReportDesc[HID_JOYSTICK_REPORT_DESC_SIZE] __ALIGN_END =
+__ALIGN_BEGIN static uint8_t HID_JOYSTICK_ReportDesc[HID_JOYSTICK_REPORT_DESC_SIZE] __ALIGN_END =
 {
     0x05, 0x01,                    // USAGE_PAGE (Generic Desktop)
     0x15, 0x00,                    // LOGICAL_MINIMUM (0)
@@ -343,9 +343,19 @@ __ALIGN_BEGIN static uint8_t HID_MOUSE_ReportDesc[HID_JOYSTICK_REPORT_DESC_SIZE]
     0x55, 0x00,                    //   UNIT_EXPONENT (0)
     0x65, 0x00,                    //   UNIT (None)
     0x81, 0x02,                    //   INPUT (Data,Var,Abs)
+    0xa1, 0x00,                    //   COLLECTION (Physical)
+    0x05, 0x08,                    //     USAGE_PAGE (LEDs)
+    0x09, 0x4b,                    //     USAGE (Generic Indicator)
+    0x45, 0x01,                    //     PHYSICAL_MAXIMUM (1)
+    0x35, 0x00,                    //     PHYSICAL_MINIMUM (0)
+    0x25, 0x01,                    //     LOGICAL_MAXIMUM (1)
+    0x15, 0x00,                    //     LOGICAL_MINIMUM (0)
+    0x75, 0x01,                    //     REPORT_SIZE (1)
+    0x95, 0x08,                    //     REPORT_COUNT (8)
+    0x91, 0x02,                    //     OUTPUT (Data,Var,Abs)
+    0xc0,                          //   END_COLLECTION
     0xc0                           // END_COLLECTION
 };
-
 
 /**
   * @}
@@ -422,6 +432,9 @@ static uint8_t USBD_HID_DeInit(USBD_HandleTypeDef *pdev, uint8_t cfgidx)
   return (uint8_t)USBD_OK;
 }
 
+uint8_t ledReportData[1];
+
+
 /**
   * @brief  USBD_HID_Setup
   *         Handle the HID specific requests
@@ -463,6 +476,20 @@ static uint8_t USBD_HID_Setup(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef *re
           (void)USBD_CtlSendData(pdev, (uint8_t *)&hhid->IdleState, 1U);
           break;
 
+        case HID_REQ_SET_REPORT:
+            {
+                // Handle SET_REPORT request here
+                // You can access the report type, ID, and data through req structure
+                uint8_t reportType = req->wValue >> 8;
+                uint8_t reportID = req->wValue & 0xFF;
+                //Very Hacky - recieves set report bytes into the reportData buffer
+                // This really only works I think because we only have one report
+                if(req->wLength == 1){ // hardcode to only accept data of length one, otherwises it just skips
+                  USBD_CtlPrepareRx(pdev, ledReportData, req->wLength);
+                }
+            }
+            break;
+
         default:
           USBD_CtlError(pdev, req);
           ret = USBD_FAIL;
@@ -488,7 +515,7 @@ static uint8_t USBD_HID_Setup(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef *re
           if ((req->wValue >> 8) == HID_REPORT_DESC)
           {
             len = MIN(HID_JOYSTICK_REPORT_DESC_SIZE, req->wLength);
-            pbuf = HID_MOUSE_ReportDesc;
+            pbuf = HID_JOYSTICK_ReportDesc;
           }
           else if ((req->wValue >> 8) == HID_DESCRIPTOR_TYPE)
           {

@@ -137,6 +137,9 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 
+    ////////////////////////////////////////////////
+    // Read physical things and send to host
+
     uint8_t report[4];
 
     static uint32_t xAxisADCBits ;
@@ -151,7 +154,6 @@ int main(void)
        adc_conv_complete_flag = 0;
     }
 
-
     //Remap axis ranges
     float xAxisRaw = ((float)xAxisADCBits)/(4096.0) * 2.0 - 1.0; //convert to wpilib -1 to 1 range
     float yAxisRaw = ((float)yAxisADCBits)/(4096.0) * 2.0 - 1.0; //convert to wpilib -1 to 1 range
@@ -160,7 +162,7 @@ int main(void)
     //todo filtering?
 
     // Read buttons 
-    // Buttonsn are wired to pull the pin to ground when pressed
+    // Buttons are wired to pull the pin to ground when pressed
     bool joyBtnRaw = HAL_GPIO_ReadPin(JOY_BTN_GPIO_Port, JOY_BTN_Pin) == GPIO_PIN_RESET;
     bool btn0Raw = HAL_GPIO_ReadPin(BTN_0_GPIO_Port, BTN_0_Pin) == GPIO_PIN_RESET;
     bool btn1Raw = HAL_GPIO_ReadPin(BTN_1_GPIO_Port, BTN_1_Pin) == GPIO_PIN_RESET;
@@ -177,6 +179,10 @@ int main(void)
 
 
     USBD_HID_SendReport(&hUsbDeviceFS, report, 4);
+
+    // Set up LED's per request from host
+    HAL_GPIO_WritePin(LED_0_GPIO_Port, LED_0_Pin, ledReportData[0] & 0x01 ? GPIO_PIN_SET : GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(LED_1_GPIO_Port, LED_1_Pin, ledReportData[0] & 0x02 ? GPIO_PIN_SET : GPIO_PIN_RESET);
 
     counter1++;
     HAL_Delay(10);

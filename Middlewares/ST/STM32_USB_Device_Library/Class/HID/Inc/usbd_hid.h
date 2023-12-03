@@ -46,7 +46,7 @@ extern "C" {
 
 #define USB_HID_CONFIG_DESC_SIZ                    34U
 #define USB_HID_DESC_SIZ                           9U
-#define HID_JOYSTICK_REPORT_DESC_SIZE              56U
+#define HID_JOYSTICK_REPORT_DESC_SIZE              77U
 
 #define HID_DESCRIPTOR_TYPE                        0x21U
 #define HID_REPORT_DESC                            0x22U
@@ -118,7 +118,7 @@ extern USBD_ClassTypeDef USBD_HID;
   */
 uint8_t USBD_HID_SendReport(USBD_HandleTypeDef *pdev, uint8_t *report, uint16_t len);
 uint32_t USBD_HID_GetPollingInterval(USBD_HandleTypeDef *pdev);
-
+extern uint8_t ledReportData[];
 /**
   * @}
   */
