@@ -116,8 +116,8 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
-  MX_DMA_Init();
   MX_ADC1_Init();
+  MX_DMA_Init();
   MX_USB_DEVICE_Init();
   /* USER CODE BEGIN 2 */
 
@@ -159,13 +159,17 @@ int main(void)
     float yAxisRaw = ((float)yAxisADCBits)/(4096.0) * 2.0 - 1.0; //convert to wpilib -1 to 1 range
     float zAxisRaw = ((float)zAxisADCBits)/(4096.0) * 2.0 - 1.0; //convert to wpilib -1 to 1 range
 
+    //todo deadzone/filtering
+
     //todo filtering?
 
     // Read buttons 
     // Buttons are wired to pull the pin to ground when pressed
+    bool btn0Raw   = HAL_GPIO_ReadPin(BTN_0_GPIO_Port, BTN_0_Pin) == GPIO_PIN_RESET;
+    bool btn1Raw   = HAL_GPIO_ReadPin(BTN_1_GPIO_Port, BTN_1_Pin) == GPIO_PIN_RESET;
+    bool btn2Raw   = HAL_GPIO_ReadPin(BTN_2_GPIO_Port, BTN_2_Pin) == GPIO_PIN_RESET;
+    bool btn3Raw   = HAL_GPIO_ReadPin(BTN_3_GPIO_Port, BTN_3_Pin) == GPIO_PIN_RESET;
     bool joyBtnRaw = HAL_GPIO_ReadPin(JOY_BTN_GPIO_Port, JOY_BTN_Pin) == GPIO_PIN_RESET;
-    bool btn0Raw = HAL_GPIO_ReadPin(BTN_0_GPIO_Port, BTN_0_Pin) == GPIO_PIN_RESET;
-    bool btn1Raw = HAL_GPIO_ReadPin(BTN_1_GPIO_Port, BTN_1_Pin) == GPIO_PIN_RESET;
 
     //populate and send report
     report[0] = (int8_t)(map(xAxisRaw, -1.0, 1.0, -128.0, 127.0));
@@ -173,9 +177,11 @@ int main(void)
     report[2] = (int8_t)(map(zAxisRaw, -1.0, 1.0, -128.0, 127.0));
     //Bitpack buttons
     report[3] = 0x00;
-    if(joyBtnRaw){ report[3] |= 0x01; }
-    if(btn0Raw)  { report[3] |= 0x02; }
-    if(btn1Raw)  { report[3] |= 0x04; }
+    if(btn0Raw)  { report[3] |= 0x01; }
+    if(btn1Raw)  { report[3] |= 0x02; }
+    if(btn2Raw)  { report[3] |= 0x04; }
+    if(btn3Raw)  { report[3] |= 0x08; }
+    if(joyBtnRaw){ report[3] |= 0x10; }
 
 
     USBD_HID_SendReport(&hUsbDeviceFS, report, 4);
@@ -183,6 +189,8 @@ int main(void)
     // Set up LED's per request from host
     HAL_GPIO_WritePin(LED_0_GPIO_Port, LED_0_Pin, ledReportData[0] & 0x01 ? GPIO_PIN_SET : GPIO_PIN_RESET);
     HAL_GPIO_WritePin(LED_1_GPIO_Port, LED_1_Pin, ledReportData[0] & 0x02 ? GPIO_PIN_SET : GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(LED_2_GPIO_Port, LED_2_Pin, ledReportData[0] & 0x04 ? GPIO_PIN_SET : GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(LED_3_GPIO_Port, LED_3_Pin, ledReportData[0] & 0x08 ? GPIO_PIN_SET : GPIO_PIN_RESET);
 
     counter1++;
     HAL_Delay(10);
@@ -333,19 +341,21 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOH_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, LED_1_Pin|LED_0_Pin, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(GPIOA, LED_3_Pin|LED_2_Pin|LED_0_Pin|LED_1_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pins : JOY_BTN_Pin BTN_1_Pin BTN_0_Pin */
-  GPIO_InitStruct.Pin = JOY_BTN_Pin|BTN_1_Pin|BTN_0_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-  GPIO_InitStruct.Pull = GPIO_PULLUP;
-  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
-
-  /*Configure GPIO pins : LED_1_Pin LED_0_Pin */
-  GPIO_InitStruct.Pin = LED_1_Pin|LED_0_Pin;
+  /*Configure GPIO pins : LED_3_Pin LED_2_Pin LED_0_Pin LED_1_Pin */
+  GPIO_InitStruct.Pin = LED_3_Pin|LED_2_Pin|LED_0_Pin|LED_1_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : JOY_BTN_Pin BTN_3_Pin BTN_2_Pin BTN_1_Pin
+                           BTN_0_Pin */
+  GPIO_InitStruct.Pin = JOY_BTN_Pin|BTN_3_Pin|BTN_2_Pin|BTN_1_Pin
+                          |BTN_0_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
 }
